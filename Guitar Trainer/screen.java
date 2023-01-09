@@ -2,12 +2,19 @@
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -16,6 +23,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
+import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.UIManager;
 
@@ -41,7 +49,16 @@ public class Screen extends JFrame implements ActionListener{
 	
 	//Inputs to change BPM and mode
 	private JTextField BPM;
-	private JTextField mode;
+	
+	private JPanel modeButtonPanel;
+	private int modePanelWidth;
+	private int modePanelHeight;
+	
+	private OptionButton NotesButton;
+	private OptionButton ChordsButton;
+	private OptionButton ProgressionsButton;
+	
+	//CurrentNotes | AllNotes | CurrentChords | NaturalNotes | AccidentalNotes | MMChords | MajorChords | MinorChords"
 
 	private Timer timer;
 	
@@ -55,45 +72,24 @@ public class Screen extends JFrame implements ActionListener{
 	//Tracks current index to avoid repeated notes
 	private int currentIndex;
 	
+	private String knownChords;
+	private String knownNotes;
+	private String knownKeys;
+	private String knownProgressions;
 	
-	//Arrays of notes/chords
+	//Strings which will be displayed on GUI
+	private String[] DisplayedChords;
+	private String[] DisplayedNotes;
+	private String[] DisplayedProgressions; //This contains chord progressions and known key signatures
 	
-	//This array contains every note as well as a string number
-	//NoteFinder mode
-	private String[] AllNotes = {"A 1", "A# 1", "B 1", "C 1", "C# 1", "D 1", "D# 1", "E 1", "F 1", "F# 1", "G 1", "G# 1",
-								 "A 2", "A# 2", "B 2", "C 2", "C# 2", "D 2", "D# 2", "E 2", "F 2", "F# 2", "G 2", "G# 2",
-								 "A 3", "A# 3", "B 3", "C 3", "C# 3", "D 3", "D# 3", "E 3", "F 3", "F# 3", "G 3", "G# 3",
-								 "A 4", "A# 4", "B 4", "C 4", "C# 4", "D 4", "D# 4", "E 4", "F 4", "F# 4", "G 4", "G# 4",
-								 "A 5", "A# 5", "B 5", "C 5", "C# 5", "D 5", "D# 5", "E 5", "F 5", "F# 5", "G 5", "G# 5",
-								 "A 6", "A# 6", "B 6", "C 6", "C# 6", "D 6", "D# 6", "E 6", "F 6", "F# 6", "G 6", "G# 6"}; 
-	//NaturalNotes mode
-	private String[] NaturalNotes = {"A 1", "B 1", "C 1", "D 1", "E 1", "F 1", "G 1",
-									 "A 2", "B 2", "C 2", "D 2", "E 2", "F 2", "G 2",
-									 "A 3", "B 3", "C 3", "D 3", "E 3", "F 3", "G 3",
-									 "A 4", "B 4", "C 4", "D 4", "E 4", "F 4", "G 4",
-									 "A 5", "B 5", "C 5", "D 5", "E 5", "F 5", "G 5",
-									 "A 6", "B 6", "C 6", "D 6", "E 6", "F 6", "G 6"};
-	//AccidentalNotes mode
-	private String[] AccidentalNotes = {"A# 1", "C# 1", "D# 1", "F# 1", "G# 1", "Bb 1", "Db 1", "Eb 1", "Gb 1", "Ab 1",
-									    "A# 2", "C# 2", "D# 2", "F# 2", "G# 2", "Bb 2", "Db 2", "Eb 2", "Gb 2", "Ab 2",
-									    "A# 3", "C# 3", "D# 3", "F# 3", "G# 3", "Bb 3", "Db 3", "Eb 3", "Gb 3", "Ab 3",
-									    "A# 4", "C# 4", "D# 4", "F# 4", "G# 4", "Bb 4", "Db 4", "Eb 4", "Gb 4", "Ab 4",
-									    "A# 5", "C# 5", "D# 5", "F# 5", "G# 5", "Bb 5", "Db 5", "Eb 5", "Gb 5", "Ab 5",
-									    "A# 6", "C# 6", "D# 6", "F# 6", "G# 6", "Bb 6", "Db 6", "Eb 6", "Gb 6", "Ab 6"};
+	private String[] KeySignatures;
 	
-	//Chords
-	
-	//Major/Minor Chords - MMChords mode
-	private String[] MajorMinorChords = {"A", "B", "C", "D", "E", "F", "G", "Am", "Bm", "Cm", "Dm", "Em", "Fm", "Gm"};
-	//MajorChords mode
-	private String[] MajorChords = {"A", "B", "C", "D", "E", "F", "G"};
-	//MinorChords mode
-	private String[] MinorChords = {"Am", "Bm", "Cm", "Dm", "Em", "Fm", "Gm"};
-	
-	//Chords I currently know
-	private String[] CurrentChords = {"A","C", "D", "E", "F", "G", "Am", "Bm", "Dm", "Em", "B7"}; //CurrentChords
-	
-	public Screen() {
+	public Screen() throws IOException {
+		
+		//Screen size variables
+		screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+		screenWidth = screenSize.width;
+		screenHeight = screenSize.height;
 		
 		//Color instantiation 
 		backgroundColor = new Color(15, 15, 18);
@@ -106,19 +102,30 @@ public class Screen extends JFrame implements ActionListener{
 		
 		//Label instantiation
 		note = new JLabel();
-		modes = new JLabel("AllNotes | CurrentChords | NaturalNotes | AccidentalNotes | MMChords | MajorChords | MinorChords");
 		
 		//TextField instantiation
 		BPM = new JTextField();
-		mode = new JTextField();
 		
-		//Screen size variables
-		screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-		screenWidth = screenSize.width;
-		screenHeight = screenSize.height;
+		modeButtonPanel = new JPanel();
+		modePanelWidth = 1400;
+		modePanelHeight = 50;
+		modeButtonPanel.setBounds(screenWidth / 2 - modePanelWidth / 2, screenHeight * 2 / 3, modePanelWidth, modePanelHeight);
+		modeButtonPanel.setLayout(new FlowLayout());
+		modeButtonPanel.setBackground(backgroundColor);
 		
+		NotesButton = new OptionButton("Notes");
+		NotesButton.addActionListener(this);
+		ChordsButton = new OptionButton("Chords");
+		ChordsButton.addActionListener(this);
+		ProgressionsButton= new OptionButton("Progressions");
+		ProgressionsButton.addActionListener(this);
+		
+		modeButtonPanel.add(NotesButton);
+		modeButtonPanel.add(ChordsButton);
+		modeButtonPanel.add(ProgressionsButton);
+	
 		//Default mode
-		currentMode = AllNotes;
+		ChordsButton.setBoldFont();
 		
 		//Firts index check
 		currentIndex = 0;
@@ -139,7 +146,7 @@ public class Screen extends JFrame implements ActionListener{
 		Dimension noteSize = note.getPreferredSize();
 		note.setBounds(screenWidth / 2 - noteSize.width / 2, (screenHeight / 3) - noteSize.height / 2, noteSize.width, noteSize.height);
 		
-		BPM.setBounds(screenWidth / 2 - 50 / 2, screenHeight / 2 - 50 / 2, 50, 50);
+		BPM.setBounds(screenWidth / 2 - 50 / 2, screenHeight / 2 + 50, 50, 50);
 		BPM.setBorder(javax.swing.BorderFactory.createEmptyBorder());
 		BPM.setBackground(backgroundColor);
 		BPM.setForeground(textColor);
@@ -148,32 +155,154 @@ public class Screen extends JFrame implements ActionListener{
 		BPM.setHorizontalAlignment(JTextField.CENTER);
 		BPM.addActionListener(this);
 		
-		mode.setBounds(screenWidth / 2 - 200 / 2, screenHeight / 2 + 50, 200, 50);
-		mode.setBorder(javax.swing.BorderFactory.createEmptyBorder());
-		mode.setBackground(backgroundColor);
-		mode.setForeground(textColor);
-		mode.setText("Mode");
-		mode.setFont(textFont);
-		mode.setHorizontalAlignment(JTextField.CENTER);
-		mode.addActionListener(this);
+		//modes.setFont(textFont);
+		//modes.setBackground(backgroundColor);
+		//modes.setForeground(textColor);
 		
-		modes.setFont(textFont);
-		modes.setBackground(backgroundColor);
-		modes.setForeground(textColor);
+		//Dimension modeDimension = modes.getPreferredSize();
 		
-		Dimension modeDimension = modes.getPreferredSize();
-		
-		modes.setBounds(screenWidth / 2 - modeDimension.width / 2, screenHeight * 2 / 3, modeDimension.width + 10, modeDimension.height);
+		//modes.setBounds(screenWidth / 2 - modeDimension.width / 2, screenHeight * 2 / 3, modeDimension.width + 10, modeDimension.height);
 
 		this.add(note);
 		this.add(BPM);
-		this.add(mode);
-		this.add(modes);
+		//this.add(modes);
+		
+		this.add(modeButtonPanel);
+		
+		//Strings of knonw data - read in from txt files
+		knownChords = getKnownData("C:\\Users\\stewa\\Desktop\\Guitar Trainer\\KnownChords.txt");
+		knownNotes = getKnownData("C:\\Users\\stewa\\Desktop\\Guitar Trainer\\KnownNotes.txt");
+		knownKeys = getKnownData("C:\\Users\\stewa\\Desktop\\Guitar Trainer\\KnownKeys.txt");
+		knownProgressions = getKnownData("C:\\Users\\stewa\\Desktop\\Guitar Trainer\\ChordProgressions.txt");
+		
+		int numChords = 0;
+		int numNotes = 0;
+		int numKeys = 0;
+		int numProgressions = 0;
+		
+		for(int i = 0; i < knownChords.length(); i ++) {
+			if(knownChords.charAt(i) == ',') {
+				numChords ++;
+			}
+			
+		}
+		
+		for(int i = 0; i < knownNotes.length(); i ++) {
+			if(knownNotes.charAt(i) == ',') {
+				numNotes ++;
+			}
+			
+		}
+		
+		for(int i = 0; i < knownKeys.length(); i ++) {
+			if(knownKeys.charAt(i) == ',') {
+				numKeys ++;
+			}
+			
+		}
+		
+		for(int i = 0; i < knownProgressions.length(); i ++) {
+			if(knownProgressions.charAt(i) == ',') {
+				numProgressions ++;
+			}
+			
+		}
+		
+		DisplayedChords = new String[numChords];
+		
+		int startIndex = 0;
+		int endIndex = 1;
+		
+		for(int i = 0; i < numChords; i ++) {
+			boolean found = false;
+			while(!found) {
+				if(knownChords.charAt(endIndex) == ',') {
+					DisplayedChords[i] = new String(knownChords.substring(startIndex, endIndex));
+					startIndex = endIndex + 1; // Moves start index to next note beginning (skips over comma)
+					endIndex += 2; // Move end index to character immediately proceeding start index 
+					found = true;
+				}else {
+					endIndex ++;
+				}
+			}
+		}
+		
+	
+		DisplayedNotes = new String[numNotes * 6];
+		
+		startIndex = 0;
+		endIndex = 1;
+		
+		for(int i = 0; i < numNotes; i ++) {
+			boolean found = false;
+			while(!found) {
+				if(knownNotes.charAt(endIndex) == ',') {
+					for(int j = 0; j < 6; j ++) {
+						DisplayedNotes[i * 6 + j] = new String(knownNotes.substring(startIndex, endIndex) + (j + 1));
+					}
+					
+					startIndex = endIndex + 1; // Moves start index to next note beginning (skips over comma)
+					endIndex += 2; // Move end index to character immediately proceeding start index 
+					found = true;
+				}else {
+					endIndex ++;
+				}
+			}
+			
+		}
+		
+		KeySignatures = new String[numKeys];
+		
+		startIndex = 0;
+		endIndex = 1;
+		
+		for(int i = 0; i < numKeys; i ++) {
+			boolean found = false;
+			while(!found) {
+				if(knownKeys.charAt(endIndex) == ',') {
+					KeySignatures[i] = new String(knownKeys.substring(startIndex, endIndex));
+					startIndex = endIndex + 1; // Moves start index to next note beginning (skips over comma)
+					endIndex += 2; // Move end index to character immediately proceeding start index 
+					found = true;
+				}else {
+					endIndex ++;
+				}
+			}
+		}
+		
+		
+		DisplayedProgressions = new String[numProgressions * numKeys];
+		
+		startIndex = 0; // for progressions
+		endIndex = 1;
+		
+		for(int i = 0; i < numProgressions; i ++) {
+			boolean found = false;
+			while(!found) {
+				if(knownProgressions.charAt(endIndex) == ',') {
+					for(int j = 0; j < numKeys; j ++) {
+						DisplayedProgressions[i * numKeys + j] = new String(KeySignatures[j] + ": " + knownProgressions.substring(startIndex, endIndex));
+					}
+					
+					startIndex = endIndex + 1; // Moves start index to next note beginning (skips over comma)
+					endIndex += 2; // Move end index to character immediately proceeding start index 
+					found = true;
+				}else {
+					endIndex ++;
+				}
+			}
+					
+		}
+		
+		
+		currentMode = DisplayedChords;
+		
 		this.setVisible(true);
 		
 		//Timer/timer task responsible for changing the note/chord
 		timer = new Timer();
 		timer.schedule(new event(currentMode), 0, 60000 / BPMValue);
+		
 	}
 	
 	//Input for BPM/mode text fields
@@ -187,36 +316,50 @@ public class Screen extends JFrame implements ActionListener{
 			timer.schedule(new event(currentMode), 0, 60000 / BPMValue);
 		}
 		
-		//Changes mode
-		if(e.getSource() == mode) {
-			if(mode.getText().equals("AllNotes")) {
-				currentMode = AllNotes;
-			}else if(mode.getText().equals("CurrentChords")) {
-				currentMode = CurrentChords;
-			}else if(mode.getText().equals("NaturalNotes")){
-				currentMode = NaturalNotes;
-			}else if(mode.getText().equals("AccidentalNotes")) {
-				currentMode = AccidentalNotes;
-			}else if(mode.getText().equals("MMChords")) {
-				currentMode = MajorMinorChords;
-			}else if(mode.getText().equals("MajorChords")) {
-				currentMode = MajorChords;
-			}else if(mode.getText().equals("MinorChords")) {
-				currentMode = MinorChords;
-			}else {
-				currentMode = AllNotes;
-			}
+		if(e.getSource() == NotesButton) {
+			
+			currentMode = DisplayedNotes;
+			NotesButton.setBoldFont();
+			ChordsButton.setNeutralFont();
+			ProgressionsButton.setNeutralFont();
+			
+		}
+		
+		if(e.getSource() == ChordsButton) {
+				
+			currentMode = DisplayedChords;
+			ChordsButton.setBoldFont();	
+			NotesButton.setNeutralFont();
+			ProgressionsButton.setNeutralFont();
+		}
+		
+		if(e.getSource() == ProgressionsButton) {
+			
+			currentMode = DisplayedProgressions;
+			ProgressionsButton.setBoldFont();	
+			NotesButton.setNeutralFont();
+			ChordsButton.setNeutralFont();
+		}
+		
+		//Mode Changer interface
 			
 			timer.cancel();
 			timer = new Timer();
 			timer.schedule(new event(currentMode), 0, 60000 / BPMValue);
-		}
 		
 	}
+		
+	
 	
 	//Returns a chord or note from an array
 	public String getMusicalEntity(String[] array, int index) { 
 		return array[index];
+	}
+	
+	//Reads the text files containing the notes/chords and returns the raw string data of the known notes or chords
+	public String getKnownData(String path) throws IOException {
+		String data = new String(Files.readAllBytes(Paths.get(path)));
+	    return data;
 	}
 	
 	//Private TimerTask class that will be responsible for changing the note/chord periodically
